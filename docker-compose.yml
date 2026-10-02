@@ -1,0 +1,43 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: insight
+      POSTGRES_PASSWORD: insight
+      POSTGRES_DB: insightforge
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U insight -d insightforge"]
+      interval: 5s
+      retries: 10
+
+  api:
+    build: .
+    env_file: [.env.example]
+    environment:
+      DATABASE_URL: postgresql+psycopg2://insight:insight@db:5432/insightforge
+      CHROMA_PATH: /app/data/chroma
+      LLM_PROVIDER: ${LLM_PROVIDER:-none}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    depends_on: { db: { condition: service_healthy } }
+    ports: ["8000:8000"]
+    volumes: [appdata:/app/data]
+
+  ui:
+    build: .
+    command: ["streamlit", "run", "app/ui/streamlit_app.py", "--server.port=8501", "--server.address=0.0.0.0"]
+    env_file: [.env.example]
+    environment:
+      DATABASE_URL: postgresql+psycopg2://insight:insight@db:5432/insightforge
+      CHROMA_PATH: /app/data/chroma
+      LLM_PROVIDER: ${LLM_PROVIDER:-none}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    depends_on: { db: { condition: service_healthy } }
+    ports: ["8501:8501"]
+    volumes: [appdata:/app/data]
+
+volumes:
+  pgdata:
+  appdata:
